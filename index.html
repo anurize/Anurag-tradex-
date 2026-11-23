@@ -222,7 +222,7 @@ async function loadTab(){
   <div class="two"><div><label>Category</label><input id="pc" placeholder="Fashion"></div><div><label>Emoji</label><input id="pe" placeholder="🛍️"></div></div>
   <div class="two"><div><label>Meesho price ₹</label><input id="pcost" type="number" inputmode="numeric"></div><div><label>Margin %</label><input id="pm" type="number" value="50"></div></div>
   <label>Photos (4 se 6 best, max 6)</label><input id="pf" type="file" accept="image/*" multiple><div class="sm" id="pprev"></div>
-  <p class="sm" id="pv">Bechne ka daam yahan dikhega</p><button class="pri" id="padd" style="width:100%">Product live karein</button></div>`+
+  <p class="sm" id="pv">Bechne ka daam yahan dikhega</p><div id="pbar" style="display:none;background:var(--bd);border-radius:99px;height:12px;margin:6px 0 12px;overflow:hidden"><div id="pfill" style="height:12px;width:0;border-radius:99px;background:linear-gradient(90deg,var(--ac),var(--ac2));transition:width .2s"></div></div><button class="pri" id="padd" style="width:100%">Product live karein</button></div>`+
   ps.map(p=>{const v=pm[p.id]||{};return `<div class="row"><div class="it"><div class="th">${im(p)}</div><div>${esc(p.name)}<br><small>Meesho ₹${v.cost??"-"} → ₹${p.price} (profit ₹${p.price-(v.cost||0)})</small></div></div><button class="ghost" data-del="${p.id}">🗑</button></div>`}).join("");
   const up=()=>{const c=+$("pcost").value,m=+$("pm").value,pr=Math.round(c*(1+m/100)/10)*10-1;$("pv").textContent=c?`Bechne ka daam ₹${pr} · profit ₹${pr-c}`:"Bechne ka daam yahan dikhega"};$("pcost").oninput=up;$("pm").oninput=up}
  else if(tab=="m"){const ms=await api("/rest/v1/messages?select=*&order=created_at.asc",{auth:1});const g={};ms.forEach(m=>(g[m.thread]=g[m.thread]||[]).push(m));
@@ -235,13 +235,27 @@ async function addProduct(){
  const n=$("pn").value.trim(),c=+$("pcost").value,m=+$("pm").value||0;if(!n||!c)return alert("Naam aur Meesho price zaroori hai");
  const fs=[...$("pf").files].slice(0,6);if(fs.length&&fs.length<4&&!confirm("Sirf "+fs.length+" photo hain. 4 se 6 photo se zyada bikri hoti hai. Phir bhi jodein?"))return;
  const b=$("padd");b.disabled=true;b.textContent="Upload ho raha hai...";
- try{const urls=[];let i=0;for(const f of fs){const blob=await new Promise(res=>{const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,900/Math.max(im.width,im.height)),cv=document.createElement("canvas");cv.width=im.width*k;cv.height=im.height*k;cv.getContext("2d").drawImage(im,0,0,cv.width,cv.height);cv.toBlob(res,"image/jpeg",.82)};im.src=r.result};r.readAsDataURL(f)});
-  const nm=Date.now()+"-"+(i++)+".jpg",r=await fetch(U+"/storage/v1/object/product-images/"+nm,{method:"POST",headers:{apikey:K,Authorization:"Bearer "+TOK,"Content-Type":"image/jpeg"},body:blob});
-  if(!r.ok)throw new Error("Photo upload fail");urls.push(U+"/storage/v1/object/public/product-images/"+nm)}
+ try{const urls=[];
+ const shrink=f=>new Promise((res,rej)=>{const t=setTimeout(()=>rej(new Error("Photo "+f.name+" khul nahi payi (format ya size)")),20000);
+  const u=URL.createObjectURL(f),im=new Image();
+  im.onload=()=>{try{const k=Math.min(1,800/Math.max(im.width,im.height)),cv=document.createElement("canvas");cv.width=Math.round(im.width*k);cv.height=Math.round(im.height*k);cv.getContext("2d").drawImage(im,0,0,cv.width,cv.height);cv.toBlob(bl=>{clearTimeout(t);URL.revokeObjectURL(u);bl?res(bl):rej(new Error("Photo convert nahi hui"))},"image/jpeg",.75)}catch(x){clearTimeout(t);rej(x)}};
+  im.onerror=()=>{clearTimeout(t);rej(new Error("Photo "+f.name+" ka format sahi nahi hai (JPG ya PNG chunein)"))};
+  im.src=u});
+ const setP=p=>{p=Math.min(100,Math.round(p));$("pbar").style.display="block";$("pfill").style.width=p+"%";b.textContent="Upload ho raha hai... "+p+"%"};
+ const blobs=[];
+ for(let j=0;j<fs.length;j++){b.textContent="Photo taiyaar ho rahi hai "+(j+1)+"/"+fs.length+"...";blobs.push(await shrink(fs[j]))}
+ const total=blobs.reduce((s,x)=>s+x.size,0)||1;let done=0;setP(0);
+ const send=(blob,nm)=>new Promise((res,rej)=>{const x=new XMLHttpRequest();x.open("POST",U+"/storage/v1/object/product-images/"+nm);
+  x.setRequestHeader("apikey",K);x.setRequestHeader("Authorization","Bearer "+TOK);x.setRequestHeader("Content-Type","image/jpeg");x.timeout=120000;
+  x.upload.onprogress=ev=>{if(ev.lengthComputable)setP((done+ev.loaded)/total*95)};
+  x.onload=()=>x.status>=200&&x.status<300?res():rej(new Error("Photo upload fail: "+x.status+" "+(x.responseText||"").slice(0,120)));
+  x.onerror=x.ontimeout=()=>rej(new Error("Internet slow hai, photo upload nahi ho payi. Dobara try karein"));x.send(blob)});
+ for(let j=0;j<blobs.length;j++){const nm=Date.now()+"-"+j+".jpg";await send(blobs[j],nm);done+=blobs[j].size;urls.push(U+"/storage/v1/object/public/product-images/"+nm)}
+ setP(97);
  const price=Math.round(c*(1+m/100)/10)*10-1;
  const row=await api("/rest/v1/products",{m:"POST",b:{name:n,category:$("pc").value.trim()||"Other",emoji:$("pe").value||"🛍️",price,images:urls},auth:1,prefer:"return=representation"});
  await api("/rest/v1/product_private",{m:"POST",b:{product_id:row[0].id,cost:c,margin:m,meesho_link:$("pl").value.trim()||null},auth:1});
- load();loadTab()}catch(e){alert("Product nahi juda: "+e.message);b.disabled=false;b.textContent="Product live karein"}}
+ setP(100);load();loadTab()}catch(e){const pb=$("pbar");if(pb)pb.style.display="none";alert("Product nahi juda: "+e.message);b.disabled=false;b.textContent="Product live karein"}}
 
 /* ---------- clicks ---------- */
 document.addEventListener("click",async e=>{
