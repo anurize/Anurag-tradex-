@@ -164,18 +164,21 @@ async function api(p,o={}){
 const rpc=(f,b,a)=>api("/rest/v1/rpc/"+f,{m:"POST",b,auth:a});
 const ls=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){}};
 
-let P=[],cart={},cat="Sab",S={upi:"",upn:"Anurag TRADEX"},PEND=null,tab="o",curT=null;
-const mrp=p=>Math.round(p.price*1.35/10)*10-1;
+let P=[],cart={},cat="Sab",S={upi:"",upn:"Anurag TRADEX",dt:"5 se 9 din"},PEND=null,tab="o",curT=null,editId=null,EI=[];
+const off=p=>+p.off_pct||0;
+const mrp=p=>off(p)>0?Math.round(p.price/(1-off(p)/100)/10)*10-1:p.price;
+const offTag=p=>off(p)>0?`<span class="off">${Math.round(off(p))}% OFF</span>`:"";
+const oldP=p=>off(p)>0?`${oldP(p)}`:"";
 const im=p=>p.images&&p.images[0]?`<img src="${esc(p.images[0])}" alt="">`:(p.emoji||"🛍️");
 async function load(){
- try{P=await api("/rest/v1/products?select=id,name,category,emoji,price,images&active=eq.true&order=id.desc")}
+ try{try{P=await api("/rest/v1/products?select=id,name,category,emoji,price,images,off_pct&active=eq.true&order=id.desc")}catch(e0){P=await api("/rest/v1/products?select=id,name,category,emoji,price,images&active=eq.true&order=id.desc")}}
  catch(e){$("grid").innerHTML="<p class='sm'>Products load nahi hue. Internet check karein.</p>";return}
- try{(await api("/rest/v1/settings?select=key,value")).forEach(r=>{if(r.key=="upi_id")S.upi=r.value||"";if(r.key=="upi_name"&&r.value)S.upn=r.value})}catch(e){}
+ try{(await api("/rest/v1/settings?select=key,value")).forEach(r=>{if(r.key=="upi_id")S.upi=r.value||"";if(r.key=="upi_name"&&r.value)S.upn=r.value;if(r.key=="delivery_text"&&r.value)S.dt=r.value})}catch(e){}
  renderStore()}
 function renderStore(){
  const cats=["Sab",...new Set(P.map(p=>p.category))];
  $("chips").innerHTML=cats.map(c=>`<button class="chip ${c==cat?"on":""}" data-c="${esc(c)}">${esc(c)}</button>`).join("");
- $("grid").innerHTML=P.filter(p=>cat=="Sab"||p.category==cat).map(p=>`<div class="card"><div class="pic" data-v="${p.id}" style="cursor:pointer">${im(p)}<span class="off">${Math.round((1-p.price/mrp(p))*100)}% OFF</span></div><div class="info"><div class="ct">${esc(p.category)}</div><div class="nm" data-v="${p.id}" style="cursor:pointer">${esc(p.name)}</div><div class="pr">₹${p.price}<span class="old">₹${mrp(p)}</span></div></div><button class="pri" data-a="${p.id}">Cart me daalein</button></div>`).join("")||"<p class='sm'>Jald hi naye products aa rahe hain.</p>";
+ $("grid").innerHTML=P.filter(p=>cat=="Sab"||p.category==cat).map(p=>`<div class="card"><div class="pic" data-v="${p.id}" style="cursor:pointer">${im(p)}${offTag(p)}</div><div class="info"><div class="ct">${esc(p.category)}</div><div class="nm" data-v="${p.id}" style="cursor:pointer">${esc(p.name)}</div><div class="pr">₹${p.price}${oldP(p)}</div></div><button class="pri" data-a="${p.id}">Cart me daalein</button></div>`).join("")||"<p class='sm'>Jald hi naye products aa rahe hain.</p>";
  renderCart()}
 const cartIds=()=>Object.keys(cart).filter(i=>P.find(p=>p.id==i));
 function renderCart(){
@@ -183,7 +186,7 @@ function renderCart(){
  $("items").innerHTML=ids.length?ids.map(i=>{const p=P.find(p=>p.id==i);return `<div class="row"><div class="it"><div class="th">${im(p)}</div><div>${esc(p.name)}<br><small>₹${p.price}</small></div></div><span class="qty"><button class="ghost" data-m="${i}">−</button> ${cart[i]} <button class="ghost" data-p="${i}">+</button></span></div>`}).join(""):"<p class='sm'>Cart khaali hai.</p>";
  $("tot").textContent="₹"+ids.reduce((s,i)=>s+cart[i]*P.find(p=>p.id==i).price,0)}
 function showProd(id){const p=P.find(p=>p.id==id);if(!p)return;const ims=p.images||[];
- $("prodS").innerHTML=`<div class="row"><b>${esc(p.name)}</b><button class="ghost" data-close>✕</button></div><div class="pic" id="mainimg" style="border-radius:14px;margin-top:10px;font-size:90px">${ims[0]?`<img src="${esc(ims[0])}" alt="">`:(p.emoji||"🛍️")}</div><div style="display:flex;gap:8px;margin:10px 0;overflow-x:auto">${ims.map((s,i)=>`<div class="th" style="width:62px;height:62px;cursor:pointer" data-th="${i}" data-pid="${p.id}"><img src="${esc(s)}" alt=""></div>`).join("")}</div><div class="pr" style="font-size:24px">₹${p.price}<span class="old">₹${mrp(p)}</span></div><p class="sm">${esc(p.category)} · UPI se payment · Pure India delivery</p><button class="pri" data-a="${p.id}" style="width:100%;padding:13px">Cart me daalein</button>`;
+ $("prodS").innerHTML=`<div class="row"><b>${esc(p.name)}</b><button class="ghost" data-close>✕</button></div><div class="pic" id="mainimg" style="border-radius:14px;margin-top:10px;font-size:90px">${ims[0]?`<img src="${esc(ims[0])}" alt="">`:(p.emoji||"🛍️")}</div><div style="display:flex;gap:8px;margin:10px 0;overflow-x:auto">${ims.map((s,i)=>`<div class="th" style="width:62px;height:62px;cursor:pointer" data-th="${i}" data-pid="${p.id}"><img src="${esc(s)}" alt=""></div>`).join("")}</div><div class="pr" style="font-size:24px">₹${p.price}${oldP(p)}</div><p class="sm">${esc(p.category)} · UPI se payment · Pure India delivery</p><button class="pri" data-a="${p.id}" style="width:100%;padding:13px">Cart me daalein</button>`;
  $("prodP").classList.add("open")}
 function copy(t,btn){const ok=()=>{if(btn){const o=btn.textContent;btn.textContent="✓ Copy ho gaya";setTimeout(()=>btn.textContent=o,1500)}};
  const fb=()=>{const a=document.createElement("textarea");a.value=t;document.body.appendChild(a);a.select();try{document.execCommand("copy");ok()}catch(e){}a.remove()};
@@ -201,10 +204,19 @@ $("cs").onclick=async()=>{const b=$("ci").value.trim(),n=($("cname").value.trim(
  ls("cname",n);try{await rpc("send_message",{p_thread:TH,p_name:n,p_body:b});$("ci").value="";$("cnw").style.display="none";loadChat()}catch(e){alert("Message nahi gaya, dobara try karein")}};
 
 /* ---------- order track ---------- */
+const STEPS=["Order mila","Payment pakki","Packed","Shipped","Delivered"];
 $("tbtn").onclick=async()=>{const id=+$("to").value,ph=$("tp").value.trim();if(!id||!/^\d{10}$/.test(ph))return alert("Order number aur 10 ank ka mobile number daalein");
  const r=$("tres");r.style.display="block";r.textContent="Dekh rahe hain...";
  try{const o=await rpc("track_order",{p_id:id,p_phone:ph});
-  r.innerHTML=o?`<b>Order #${o.id}</b> · ${esc(o.status)}<br>${(o.items||[]).map(i=>esc(i.name)+" × "+esc(i.q)).join("<br>")}<br>Total ₹${o.total}<br><span class="sm">${fmt(o.time)}</span>`:"Order nahi mila. Order number aur mobile number check karein."}
+  if(!o){r.textContent="Order nahi mila. Order number aur mobile number check karein.";return}
+  const idx=o.status=="Delivered"?4:o.status=="Shipped"?3:o.status=="Packed"?2:(o.paid?1:0);
+  const line=o.status=="Cancel"?`<p><b>❌ Ye order cancel ho gaya hai.</b></p>`:`<div style="display:flex;gap:4px;margin:10px 0">${STEPS.map((s,i)=>`<div style="flex:1;text-align:center;font-size:11px;color:${i<=idx?"var(--ac)":"var(--mu)"}"><div style="height:6px;border-radius:99px;background:${i<=idx?"var(--ac)":"var(--bd)"};margin-bottom:5px"></div>${i<=idx?"✔ ":""}${s}</div>`).join("")}</div>`;
+  const lk=o.tracking_link&&/^https?:\/\//.test(o.tracking_link)?` · <a href="${esc(o.tracking_link)}" target="_blank" rel="noopener" style="color:var(--ac)">Link kholein</a>`:"";
+  r.innerHTML=`<b>Order #${o.id}</b> · ${esc(o.status)}${line}${(o.items||[]).map(i=>esc(i.name)+" × "+esc(i.q)).join("<br>")}<br>Total ₹${o.total}`+
+   (o.courier||o.tracking_id?`<br><b>Courier:</b> ${esc(o.courier||"-")}<br><b>Tracking ID:</b> ${esc(o.tracking_id||"-")}${lk}`:"")+
+   (o.eta?`<br><b>Kab tak pahunchega:</b> ${esc(o.eta)}`:`<br><b>Kab tak:</b> lagbhag ${esc(S.dt)}`)+
+   (o.note?`<br><b>Note:</b> ${esc(o.note)}`:"")+
+   `<br><span class="sm">${fmt(o.time)}</span><button class="ghost" id="help" data-oid="${o.id}" data-ph="${esc(ph)}" style="width:100%;margin-top:10px">🙋 Mujhe madad chahiye</button>`}
  catch(e){r.textContent="Abhi status nahi mil paya, thodi der baad try karein."}};
 
 /* ---------- admin ---------- */
@@ -212,6 +224,15 @@ async function route(){const a=location.hash=="#admin";$("store").style.display=
  $("lock").style.display=TOK?"none":"";$("dash").style.display=TOK?"":"none";if(a&&TOK)loadTab()}
 $("login").onclick=async()=>{try{const r=await fetch(U+"/auth/v1/token?grant_type=password",{method:"POST",headers:{apikey:K,"Content-Type":"application/json"},body:JSON.stringify({email:$("le").value.trim(),password:$("lp").value})});
  const j=await r.json();if(!r.ok||!j.access_token)return alert("Email ya password galat hai");TOK=j.access_token;try{sessionStorage.setItem("tk",TOK)}catch(e){}$("lp").value="";route()}catch(e){alert("Login nahi ho paya, internet check karein")}};
+const trkBox=o=>`<details style="margin-top:10px"><summary>🚚 Tracking${o.tracking_id?" ✔":""}</summary>
+<label>Courier ka naam</label><input id="tc${o.id}" value="${esc(o.courier||"")}" placeholder="Delhivery">
+<label>Tracking ID</label><input id="ti${o.id}" value="${esc(o.tracking_id||"")}">
+<label>Tracking link (ho to)</label><input id="tl${o.id}" value="${esc(o.tracking_link||"")}">
+<label>Kab tak pahunchega</label><input id="te${o.id}" value="${esc(o.eta||"")}" placeholder="28 Nov tak">
+<label>Customer ke liye note</label><input id="tn${o.id}" value="${esc(o.note||"")}">
+<p class="sm">Yahan Meesho ka naam mat likhna, ye customer ko dikhta hai.</p>
+<button class="pri" data-trk="${o.id}" style="width:100%">Tracking save karein</button></details>`;
+const drawEI=()=>{const d=$("eimgs");if(d)d.innerHTML=EI.map((u,i)=>`<div style="position:relative"><div class="th" style="width:64px;height:64px"><img src="${esc(u)}" alt=""></div><button class="ghost" data-rmimg="${i}" style="position:absolute;top:-6px;right:-6px;padding:0 7px;border-radius:99px;background:var(--bg)">✕</button></div>`).join("")};
 async function loadTab(){
  const T=$("tab");T.innerHTML="<p class='sm'>Loading...</p>";
  try{api("/rest/v1/messages?select=id&sender=eq.customer&seen=eq.false",{auth:1}).then(r=>$("bd").innerHTML=r.length?`<span class="bd">${r.length}</span>`:"").catch(()=>{});
@@ -221,25 +242,30 @@ async function loadTab(){
   (os.map(o=>`<div class="ord"><h3><span>Order #${o.id}</span><span class="profit">+₹${pf(o)}</span></h3><div class="sm">${fmt(o.created_at)}</div>
   ${o.items.map(i=>`<div class="row"><div class="it"><div class="th">${i.image?`<img src="${esc(i.image)}" alt="">`:"🛍️"}</div><div>${esc(i.name)} × ${i.q}<br><small>Bechna ₹${i.price} · Meesho ₹${i.cost}</small></div></div></div>`).join("")}
   <p><b>${esc(o.name)}</b> · ${esc(o.phone)}<br>${esc(o.address)} – ${esc(o.pincode)}<br><b>Total ₹${o.total}</b> (UPI)<br>UTR: <b>${esc(o.utr||"-")}</b> <label style="display:inline"><input type="checkbox" data-pd="${o.id}" ${o.paid?"checked":""} style="width:auto"> Payment mil gaya</label></p>
-  <div class="two"><button class="pri" data-copy="${o.id}">📋 Copy sab</button><select class="st" data-st="${o.id}">${["Naya","Meesho pe order kiya","Shipped","Delivered","Cancel"].map(s=>`<option ${s==o.status?"selected":""}>${s}</option>`).join("")}</select></div></div>`).join("")||"<p class='sm'>Abhi koi order nahi aaya.</p>")}
+  <div class="two"><button class="pri" data-copy="${o.id}">📋 Copy sab</button><select class="st" data-st="${o.id}">${["Naya","Meesho pe order kiya","Shipped","Delivered","Cancel"].map(s=>`<option ${s==o.status?"selected":""}>${s}</option>`).join("")}</select></div>${trkBox(o)}</div>`).join("")||"<p class='sm'>Abhi koi order nahi aaya.</p>")}
  else if(tab=="p"){const [ps,pv]=await Promise.all([api("/rest/v1/products?select=*&order=id.desc",{auth:1}),api("/rest/v1/product_private?select=*",{auth:1})]);
   const pm={};pv.forEach(x=>pm[x.product_id]=x);
-  T.innerHTML=`<div class="ord"><b>Naya product jodein</b><label>Meesho link (sirf aapko dikhega)</label><input id="pl"><label>Product ka naam</label><input id="pn">
-  <div class="two"><div><label>Category</label><input id="pc" placeholder="Fashion"></div><div><label>Emoji</label><input id="pe" placeholder="🛍️"></div></div>
-  <div class="two"><div><label>Meesho price ₹</label><input id="pcost" type="number" inputmode="numeric"></div><div><label>Margin %</label><input id="pm" type="number" value="50"></div></div>
-  <label>Photos (4 se 6 best, max 6)</label><input id="pf" type="file" accept="image/*" multiple><div class="sm" id="pprev"></div>
-  <p class="sm" id="pv">Bechne ka daam yahan dikhega</p><div id="pbar" style="display:none;background:var(--bd);border-radius:99px;height:12px;margin:6px 0 12px;overflow:hidden"><div id="pfill" style="height:12px;width:0;border-radius:99px;background:linear-gradient(90deg,var(--ac),var(--ac2));transition:width .2s"></div></div><button class="pri" id="padd" style="width:100%">Product live karein</button></div>`+
-  ps.map(p=>{const v=pm[p.id]||{};return `<div class="row"><div class="it"><div class="th">${im(p)}</div><div>${esc(p.name)}<br><small>Meesho ₹${v.cost??"-"} → ₹${p.price} (profit ₹${p.price-(v.cost||0)})</small></div></div><button class="ghost" data-del="${p.id}">🗑</button></div>`}).join("");
-  const up=()=>{const c=+$("pcost").value,m=+$("pm").value,pr=Math.round(c*(1+m/100)/10)*10-1;$("pv").textContent=c?`Bechne ka daam ₹${pr} · profit ₹${pr-c}`:"Bechne ka daam yahan dikhega"};$("pcost").oninput=up;$("pm").oninput=up}
+  const E=editId?ps.find(p=>p.id==editId):null,V=E?(pm[E.id]||{}):{};EI=E?[...(E.images||[])]:[];
+  T.innerHTML=`<div class="ord"><b>${E?"✏️ Product edit karein":"Naya product jodein"}</b><label>Meesho link (sirf aapko dikhega)</label><input id="pl" value="${esc(V.meesho_link||"")}"><label>Product ka naam</label><input id="pn" value="${esc(E?E.name:"")}">
+  <div class="two"><div><label>Category</label><input id="pc" placeholder="Fashion" value="${esc(E?E.category:"")}"></div><div><label>Emoji</label><input id="pe" placeholder="🛍️" value="${esc(E?E.emoji:"")}"></div></div>
+  <div class="two"><div><label>Meesho price ₹</label><input id="pcost" type="number" inputmode="numeric" value="${V.cost??""}"></div><div><label>Margin %</label><input id="pm" type="number" value="${V.margin??50}"></div></div>
+  <label>% off (customer ko dikhega, khaali = koi off nahi)</label><input id="po" type="number" inputmode="numeric" placeholder="jaise 30" value="${E&&+E.off_pct?E.off_pct:""}">
+  <label>Photos (4 se 6 best, max 6)</label><div id="eimgs" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px"></div><input id="pf" type="file" accept="image/*" multiple><div class="sm" id="pprev"></div>
+  <p class="sm" id="pv">Bechne ka daam yahan dikhega</p>
+  <div id="pbar" style="display:none;background:var(--bd);border-radius:99px;height:12px;margin:6px 0 12px;overflow:hidden"><div id="pfill" style="height:12px;width:0;border-radius:99px;background:linear-gradient(90deg,var(--ac),var(--ac2));transition:width .2s"></div></div>
+  <button class="pri" id="padd" style="width:100%">${E?"Save karein":"Product live karein"}</button>${E?`<button class="ghost" data-canceledit style="width:100%;margin-top:8px">Edit chhodein</button>`:""}</div>`+
+  ps.map(p=>{const v=pm[p.id]||{};return `<div class="row"><div class="it"><div class="th">${im(p)}</div><div>${esc(p.name)}<br><small>Meesho ₹${v.cost??"-"} → ₹${p.price} (profit ₹${p.price-(v.cost||0)})${+p.off_pct?` · ${p.off_pct}% off`:""}</small></div></div><span><button class="ghost" data-edit="${p.id}">✏️</button> <button class="ghost" data-del="${p.id}">🗑</button></span></div>`}).join("");
+  drawEI();
+  const up=()=>{const c=+$("pcost").value,m=+$("pm").value,pr=Math.round(c*(1+m/100)/10)*10-1;$("pv").textContent=c?`Bechne ka daam ₹${pr} · profit ₹${pr-c}`:"Bechne ka daam yahan dikhega"};$("pcost").oninput=up;$("pm").oninput=up;up()}
  else if(tab=="m"){const ms=await api("/rest/v1/messages?select=*&order=created_at.asc",{auth:1});const g={};ms.forEach(m=>(g[m.thread]=g[m.thread]||[]).push(m));
   if(curT&&g[curT]){T.innerHTML=`<button class="ghost" data-thr="">← Sab chats</button><h3>${esc(g[curT].find(m=>m.name&&m.sender=="customer")?.name||"Customer")}</h3><div>${g[curT].map(m=>`<div class="bub ${m.sender=="owner"?"me":""}">${esc(m.body)}</div>`).join("")}</div><div class="two" style="grid-template-columns:1fr auto;margin-top:10px"><input id="ri" placeholder="Jawab likhein..."><button class="pri" id="rs">Bhejein</button></div>`;
    api("/rest/v1/messages?thread=eq."+curT+"&sender=eq.customer&seen=eq.false",{m:"PATCH",b:{seen:true},auth:1}).catch(()=>{})}
   else T.innerHTML=Object.entries(g).reverse().map(([t,a])=>{const l=a[a.length-1],u=a.filter(m=>m.sender=="customer"&&!m.seen).length;return `<div class="row" data-thr="${t}" style="cursor:pointer"><div style="pointer-events:none"><b>${esc(a.find(m=>m.name)?.name||"Customer")}</b>${u?`<span class="bd">${u}</span>`:""}<br><small>${esc(l.body.slice(0,60))}</small></div><span class="sm" style="pointer-events:none">${fmt(l.created_at)}</span></div>`}).join("")||"<p class='sm'>Abhi koi message nahi aaya.</p>"}
- else T.innerHTML=`<div class="ord"><b>UPI (paisa yahan aayega)</b><label>Aapki UPI ID</label><input id="upi" value="${esc(S.upi)}" placeholder="naam@bank"><label>Naam (customer ko dikhega)</label><input id="upn" value="${esc(S.upn)}"><button class="pri" id="supi" style="margin-top:10px;width:100%">UPI save</button></div><button class="ghost" id="lo" style="width:100%">Logout</button>`
+ else T.innerHTML=`<div class="ord"><b>UPI (paisa yahan aayega)</b><label>Aapki UPI ID</label><input id="upi" value="${esc(S.upi)}" placeholder="naam@bank"><label>Naam (customer ko dikhega)</label><input id="upn" value="${esc(S.upn)}"><label>Saman kitne din mein pahunchega (customer ko dikhega)</label><input id="dtx" value="${esc(S.dt)}" placeholder="5 se 9 din"><button class="pri" id="supi" style="margin-top:10px;width:100%">Save</button></div><button class="ghost" id="lo" style="width:100%">Logout</button>`
  }catch(e){T.innerHTML=`<p class="sm">Dikkat aayi: ${esc(e.message)}</p>`}}
 async function addProduct(){
- const n=$("pn").value.trim(),c=+$("pcost").value,m=+$("pm").value||0;if(!n||!c)return alert("Naam aur Meesho price zaroori hai");
- const fs=[...$("pf").files].slice(0,6);if(fs.length&&fs.length<4&&!confirm("Sirf "+fs.length+" photo hain. 4 se 6 photo se zyada bikri hoti hai. Phir bhi jodein?"))return;
+ const n=$("pn").value.trim(),c=+$("pcost").value,m=+$("pm").value||0,off=Math.min(90,Math.max(0,+$("po").value||0));if(!n||!c)return alert("Naam aur Meesho price zaroori hai");
+ const fs=[...$("pf").files].slice(0,Math.max(0,6-EI.length)),tot=EI.length+fs.length;if(tot>0&&tot<4&&!confirm("Sirf "+tot+" photo hain. 4 se 6 photo se zyada bikri hoti hai. Phir bhi aage badhein?"))return;
  const b=$("padd");b.disabled=true;b.textContent="Upload ho raha hai...";
  try{const urls=[];
  const shrink=f=>new Promise((res,rej)=>{const t=setTimeout(()=>rej(new Error("Photo "+f.name+" khul nahi payi (format ya size)")),20000);
@@ -258,10 +284,12 @@ async function addProduct(){
   x.onerror=x.ontimeout=()=>rej(new Error("Internet slow hai, photo upload nahi ho payi. Dobara try karein"));x.send(blob)});
  for(let j=0;j<blobs.length;j++){const nm=Date.now()+"-"+j+".jpg";await send(blobs[j],nm);done+=blobs[j].size;urls.push(U+"/storage/v1/object/public/product-images/"+nm)}
  setP(97);
- const price=Math.round(c*(1+m/100)/10)*10-1;
- const row=await api("/rest/v1/products",{m:"POST",b:{name:n,category:$("pc").value.trim()||"Other",emoji:$("pe").value||"🛍️",price,images:urls},auth:1,prefer:"return=representation"});
- await api("/rest/v1/product_private",{m:"POST",b:{product_id:row[0].id,cost:c,margin:m,meesho_link:$("pl").value.trim()||null},auth:1});
- setP(100);load();loadTab()}catch(e){const pb=$("pbar");if(pb)pb.style.display="none";alert("Product nahi juda: "+e.message);b.disabled=false;b.textContent="Product live karein"}}
+ const price=Math.round(c*(1+m/100)/10)*10-1,imgs=[...EI,...urls];
+ const base={name:n,category:$("pc").value.trim()||"Other",emoji:$("pe").value||"🛍️",price,images:imgs,off_pct:off},prv={cost:c,margin:m,meesho_link:$("pl").value.trim()||null};
+ if(editId){await api("/rest/v1/products?id=eq."+editId,{m:"PATCH",b:base,auth:1});await api("/rest/v1/product_private?product_id=eq."+editId,{m:"PATCH",b:prv,auth:1})}
+ else{const row=await api("/rest/v1/products",{m:"POST",b:base,auth:1,prefer:"return=representation"});await api("/rest/v1/product_private",{m:"POST",b:{product_id:row[0].id,...prv},auth:1})}
+ editId=null;
+ setP(100);load();loadTab()}catch(e){const pb=$("pbar");if(pb)pb.style.display="none";alert("Product nahi juda: "+e.message);b.disabled=false;b.textContent=editId?"Save karein":"Product live karein"}}
 
 /* ---------- clicks ---------- */
 document.addEventListener("click",async e=>{
@@ -273,18 +301,26 @@ document.addEventListener("click",async e=>{
  if(d.p){cart[d.p]++;renderCart()}
  if(d.m&&--cart[d.m]<=0){delete cart[d.m];renderCart()}
  if("close" in d)document.querySelectorAll(".panel").forEach(x=>x.classList.remove("open"));
- if(d.t){tab=d.t;curT=null;document.querySelectorAll(".tabs .chip").forEach(x=>x.classList.toggle("on",x.dataset.t==tab));loadTab()}
+ if(d.t){tab=d.t;curT=null;editId=null;document.querySelectorAll(".tabs .chip").forEach(x=>x.classList.toggle("on",x.dataset.t==tab));loadTab()}
  if(d.copy){const o=window.OS.find(o=>o.id==d.copy);copy(`Naam: ${o.name}\nMobile: ${o.phone}\nAddress: ${o.address}\nPincode: ${o.pincode}\n\n`+o.items.map(i=>`${i.name} x${i.q}${i.link?"\n"+i.link:""}`).join("\n"),t)}
  if(d.del&&confirm("Ye product hata dein?")){try{await api("/rest/v1/products?id=eq."+d.del,{m:"DELETE",auth:1});load();loadTab()}catch(x){alert(x.message)}}
  if(d.thr!==undefined){curT=d.thr||null;loadTab()}
+ if(d.edit){editId=+d.edit;tab="p";loadTab();scrollTo(0,0)}
+ if("canceledit" in d){editId=null;loadTab()}
+ if(d.rmimg!==undefined){EI.splice(+d.rmimg,1);drawEI()}
+ if(d.trk){const g=k=>$(k+d.trk).value.trim(),vals=["tc","ti","tl","te","tn"].map(g);
+  if(vals.some(v=>/meesho/i.test(v)))return alert("Meesho ka naam customer ko dikhta hai. Usse hata dein.");
+  try{await api("/rest/v1/orders?id=eq."+d.trk,{m:"PATCH",b:{courier:vals[0]||null,tracking_id:vals[1]||null,tracking_link:vals[2]||null,eta:vals[3]||null,note:vals[4]||null},auth:1});t.textContent="✓ Save ho gaya";setTimeout(()=>t.textContent="Tracking save karein",1500)}
+  catch(x){alert("Save nahi hua: "+x.message+" (pehle Supabase mein naya SQL chalaya?)")}}
  const id=t.id;
  if(id=="padd")addProduct();
+ if(id=="help"){try{await rpc("send_message",{p_thread:TH,p_name:ls("cname")||"Customer",p_body:`Order #${t.dataset.oid} ke baare mein madad chahiye. Mobile: ${t.dataset.ph}`});t.textContent="✓ Message bhej diya. Jawab Help chat mein milega"}catch(x){alert("Message nahi gaya, dobara try karein")}}
  if(id=="rs"){const b=$("ri").value.trim();if(b)try{await api("/rest/v1/messages",{m:"POST",b:{thread:curT,name:"Owner",sender:"owner",body:b},auth:1});loadTab()}catch(x){alert(x.message)}}
- if(id=="supi")try{for(const [k,v] of [["upi_id",$("upi").value.trim()],["upi_name",$("upn").value.trim()]])await api("/rest/v1/settings?key=eq."+k,{m:"PATCH",b:{value:v},auth:1});S.upi=$("upi").value.trim();S.upn=$("upn").value.trim()||S.upn;alert("UPI save ho gayi")}catch(x){alert(x.message)}
+ if(id=="supi")try{for(const [k,v] of [["upi_id",$("upi").value.trim()],["upi_name",$("upn").value.trim()],["delivery_text",$("dtx").value.trim()||"5 se 9 din"]])await api("/rest/v1/settings?key=eq."+k,{m:"PATCH",b:{value:v},auth:1});S.upi=$("upi").value.trim();S.upn=$("upn").value.trim()||S.upn;S.dt=$("dtx").value.trim()||"5 se 9 din";alert("Save ho gaya")}catch(x){alert(x.message)}
  if(id=="lo"){TOK=null;try{sessionStorage.removeItem("tk")}catch(x){}route()}
  if(id=="paid"){const u=$("utr").value.trim();if(!/^\d{12}$/.test(u))return alert("12 ank ka UTR sahi daalein");t.disabled=true;
   try{const oid=await rpc("place_order",{p_name:PEND.name,p_phone:PEND.phone,p_address:PEND.addr,p_pin:PEND.pin,p_items:PEND.items,p_utr:u});cart={};renderCart();
-   $("done").innerHTML=`<b>✅ Order #${oid} mil gaya!</b><br>Shukriya ${esc(PEND.name)}. Payment verify hote hi order process hoga.<br><span class="sm">Order #${oid} aur mobile ${esc(PEND.phone)} se aap status track kar sakte hain.</span>`}
+   $("done").innerHTML=`<b>✅ Order #${oid} mil gaya!</b><br>Shukriya ${esc(PEND.name)}. Payment verify hote hi order process hoga. Saman lagbhag <b>${esc(S.dt)}</b> mein pahunchega.<br><span class="sm">Order #${oid} aur mobile ${esc(PEND.phone)} se aap status track kar sakte hain.</span>`}
   catch(x){alert("Order nahi ho paya, dobara try karein");t.disabled=false}}
  if(id=="back"){$("form").style.display="";$("done").style.display="none"}
 });
