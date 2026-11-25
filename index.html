@@ -132,6 +132,12 @@ details p{color:var(--mu);margin:8px 0 0;font-size:14px}
 .hero img{width:100%!important;max-width:560px;border-radius:18px;border:1px solid #1de9a0;box-shadow:0 0 34px #1de9a033;margin:6px 0 0!important}
 .hd .brand img{height:34px;border-radius:8px}
 
+.szs{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 10px}
+.szc{background:transparent;border:1px solid #25805f;color:var(--tx);border-radius:10px;min-width:46px;padding:9px 12px;font-weight:600}
+.szc.on{background:var(--ac);color:#022;border-color:var(--ac)}
+.hl{margin:6px 0 10px;padding-left:18px;font-size:13px;color:var(--tx)}.hl li{margin:3px 0}
+.vid{display:block;text-align:center;text-decoration:none;border:1px solid var(--ac);color:var(--ac);border-radius:999px;padding:11px;font-weight:700;margin:8px 0;font-size:13px;letter-spacing:.5px}
+
 .fab{position:fixed;right:14px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:8;box-shadow:0 0 22px #1de9a066;border-radius:99px;padding:13px 18px}
 .bub{max-width:80%;padding:8px 12px;border-radius:14px;margin:6px 0;background:var(--card);font-size:14px;word-wrap:break-word}
 .bub.me{margin-left:auto;background:var(--ac);color:#022}
@@ -231,7 +237,7 @@ async function api(p,o={}){
 const rpc=(f,b,a)=>api("/rest/v1/rpc/"+f,{m:"POST",b,auth:a});
 const ls=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){}};
 
-let P=[],cart={},cat="Sab",S={upi:"",upn:"Anurag TRADEX",dt:"5-9 days"},PEND=null,tab="o",curT=null,editId=null,EI=[],qs="";
+let P=[],cart={},cat="Sab",S={upi:"",upn:"Anurag TRADEX",dt:"5-9 days"},PEND=null,tab="o",curT=null,editId=null,EI=[],qs="",selSize="";
 const enDt=s=>String(s).replace(/\s*se\s*/i,"-").replace(/\s*din\b/i," days");
 const off=p=>+p.off_pct||0;
 const mrp=p=>off(p)>0?Math.round(p.price/(1-off(p)/100)/10)*10-1:p.price;
@@ -239,7 +245,7 @@ const offTag=p=>off(p)>0?`<span class="off">${Math.round(off(p))}% OFF</span>`:"
 const oldP=p=>off(p)>0?`<span class="old">₹${mrp(p)}</span>`:"";
 const im=p=>p.images&&p.images[0]?`<img src="${esc(p.images[0])}" alt="">`:(p.emoji||"🛍️");
 async function load(){
- try{try{P=await api("/rest/v1/products?select=id,name,category,emoji,price,images,off_pct&active=eq.true&order=id.desc")}catch(e0){P=await api("/rest/v1/products?select=id,name,category,emoji,price,images&active=eq.true&order=id.desc")}}
+ try{try{P=await api("/rest/v1/products?select=id,name,category,emoji,price,images,off_pct,description,highlights,sizes,video_url&active=eq.true&order=id.desc")}catch(e00){try{P=await api("/rest/v1/products?select=id,name,category,emoji,price,images,off_pct&active=eq.true&order=id.desc")}catch(e0){P=await api("/rest/v1/products?select=id,name,category,emoji,price,images&active=eq.true&order=id.desc")}}}
  catch(e){$("grid").innerHTML="<p class='sm'>Products could not load. Please check your internet.</p>";return}
  try{(await api("/rest/v1/settings?select=key,value")).forEach(r=>{if(r.key=="upi_id")S.upi=r.value||"";if(r.key=="upi_name"&&r.value)S.upn=r.value;if(r.key=="delivery_text"&&r.value)S.dt=enDt(r.value)})}catch(e){}
  renderStore()}
@@ -253,13 +259,24 @@ function renderStore(){
  $("grid").innerHTML=L.map((p,i)=>`<div class="card ${i==0&&L.length>2&&cat=="Sab"&&!qs?"feat":""}"><div class="pic" data-v="${p.id}" style="cursor:pointer">${im(p)}${offTag(p)}<button class="heart ${WL.includes(p.id)?"on":""}" data-w="${p.id}" aria-label="Save">${WL.includes(p.id)?"♥":"♡"}</button></div><div class="info"><div class="nmpr"><div class="nm" data-v="${p.id}" style="cursor:pointer">${esc(p.name)}</div><div class="pr">₹${p.price}${oldP(p)}</div></div><div class="ct">${esc(p.category)}</div></div><div class="btns"><button class="pri" data-b="${p.id}">BUY NOW</button><button class="ghost" data-a="${p.id}">Add to Cart</button></div></div>`).join("")||`<p class="sm">${cat=="__wl"?"No saved items yet. Tap ♡ on any product.":cat=="__sale"?"No sale items right now.":qs?"No products found.":"New products coming soon."}</p>`;
  if($("fqd"))$("fqd").textContent="Usually "+S.dt+". It may vary slightly by city.";
  renderCart()}
-const cartIds=()=>Object.keys(cart).filter(i=>P.find(p=>p.id==i));
+const pid=k=>+String(k).split("~")[0],psz=k=>String(k).split("~")[1]||"";
+const cartIds=()=>Object.keys(cart).filter(k=>P.find(p=>p.id==pid(k)));
 function renderCart(){
  const ids=cartIds(),n=ids.reduce((s,i)=>s+cart[i],0);$("cnt").textContent=n;$("cnt").style.display=n?"":"none";
- $("items").innerHTML=ids.length?ids.map(i=>{const p=P.find(p=>p.id==i);return `<div class="row"><div class="it"><div class="th">${im(p)}</div><div>${esc(p.name)}<br><small>₹${p.price}</small></div></div><span class="qty"><button class="ghost" data-m="${i}">−</button> ${cart[i]} <button class="ghost" data-p="${i}">+</button></span></div>`}).join(""):"<p class='sm'>Your cart is empty.</p>";
- $("tot").textContent="₹"+ids.reduce((s,i)=>s+cart[i]*P.find(p=>p.id==i).price,0)}
-function showProd(id){const p=P.find(p=>p.id==id);if(!p)return;const ims=p.images||[];
- $("prodS").innerHTML=`<div class="row"><b>${esc(p.name)}</b><button class="ghost" data-close>✕</button></div><div class="pic" id="mainimg" style="margin:10px 0 0;font-size:90px">${ims[0]?`<img src="${esc(ims[0])}" alt="">`:(p.emoji||"🛍️")}</div><div style="display:flex;gap:8px;margin:10px 0;overflow-x:auto">${ims.map((s,i)=>`<div class="th" style="width:62px;height:62px;cursor:pointer" data-th="${i}" data-pid="${p.id}"><img src="${esc(s)}" alt=""></div>`).join("")}</div><div class="pr" style="font-size:24px;text-align:left">₹${p.price}${oldP(p)}</div><p class="sm">${esc(p.category)} · UPI payment · Pan-India delivery</p><div class="btns" style="padding:0"><button class="pri" data-b="${p.id}">BUY NOW</button><button class="ghost" data-a="${p.id}">Add to Cart</button></div>`;
+ $("items").innerHTML=ids.length?ids.map(i=>{const p=P.find(p=>p.id==pid(i));return `<div class="row"><div class="it"><div class="th">${im(p)}</div><div>${esc(p.name)}${psz(i)?` <small>(Size ${esc(psz(i))})</small>`:""}<br><small>₹${p.price}</small></div></div><span class="qty"><button class="ghost" data-m="${i}">−</button> ${cart[i]} <button class="ghost" data-p="${i}">+</button></span></div>`}).join(""):"<p class='sm'>Your cart is empty.</p>";
+ $("tot").textContent="₹"+ids.reduce((s,i)=>s+cart[i]*P.find(p=>p.id==pid(i)).price,0)}
+const VID=/^https:\/\/(www\.|m\.)?(instagram\.com|youtube\.com|youtu\.be)\//i;
+function addItem(id,mode,panel){const p=P.find(p=>p.id==id);if(!p)return;let key=String(id);
+ if((p.sizes||[]).length){if(!panel){showProd(id);return}if(!selSize){alert("Please select a size");return}key=id+"~"+selSize}
+ cart[key]=mode=="buy"?(cart[key]||1):(cart[key]||0)+1;renderCart();
+ $("prodP").classList.remove("open");$("form").style.display="";$("done").style.display="none";$("cartP").classList.add("open")}
+function showProd(id){const p=P.find(p=>p.id==id);if(!p)return;selSize="";const ims=p.images||[],szs=p.sizes||[],hl=(p.highlights||"").split("\n").map(s=>s.trim()).filter(Boolean);
+ $("prodS").innerHTML=`<div class="row"><b>${esc(p.name)}</b><button class="ghost" data-close>✕</button></div><div class="pic" id="mainimg" style="margin:10px 0 0;font-size:90px">${ims[0]?`<img src="${esc(ims[0])}" alt="">`:(p.emoji||"🛍️")}</div><div style="display:flex;gap:8px;margin:10px 0;overflow-x:auto">${ims.map((s,i)=>`<div class="th" style="width:62px;height:62px;cursor:pointer" data-th="${i}" data-pid="${p.id}"><img src="${esc(s)}" alt=""></div>`).join("")}</div><div class="pr" style="font-size:24px;text-align:left">₹${p.price}${oldP(p)}</div><p class="sm">${esc(p.category)} · UPI payment · Pan-India delivery</p>`+
+ (szs.length?`<label style="margin-top:6px">Select size</label><div class="szs">${szs.map(s=>`<button class="szc" data-sz="${esc(s)}">${esc(s)}</button>`).join("")}</div>`:"")+
+ (p.description?`<p style="white-space:pre-line;font-size:13px;color:var(--mu);margin:12px 0 6px">${esc(p.description)}</p>`:"")+
+ (hl.length?`<ul class="hl">${hl.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:"")+
+ (p.video_url&&VID.test(p.video_url)?`<a class="vid" href="${esc(p.video_url)}" target="_blank" rel="noopener">▶ Watch video</a>`:"")+
+ `<div class="btns" style="padding:0;margin-top:12px"><button class="pri" data-b="${p.id}">BUY NOW</button><button class="ghost" data-a="${p.id}">Add to Cart</button></div>`;
  $("prodP").classList.add("open")}
 function copy(t,btn){const ok=()=>{if(btn){const o=btn.textContent;btn.textContent="✓ Copy ho gaya";setTimeout(()=>btn.textContent=o,1500)}};
  const fb=()=>{const a=document.createElement("textarea");a.value=t;document.body.appendChild(a);a.select();try{document.execCommand("copy");ok()}catch(e){}a.remove()};
@@ -313,7 +330,7 @@ async function loadTab(){
   const pf=o=>o.items.reduce((s,i)=>s+i.q*(i.price-i.cost),0),tp=os.filter(o=>o.paid).reduce((s,o)=>s+pf(o),0);
   T.innerHTML=`<div class="two"><div class="trust" style="display:block;margin:0"><div><b>${os.length}</b>Total orders</div></div><div class="trust" style="display:block;margin:0"><div><b class="profit">₹${tp}</b>Profit (paid orders)</div></div></div><br>`+
   (os.map(o=>`<div class="ord"><h3><span>Order #${o.id}</span><span class="profit">+₹${pf(o)}</span></h3><div class="sm">${fmt(o.created_at)}</div>
-  ${o.items.map(i=>`<div class="row"><div class="it"><div class="th">${i.image?`<img src="${esc(i.image)}" alt="">`:"🛍️"}</div><div>${esc(i.name)} × ${i.q}<br><small>Bechna ₹${i.price} · Meesho ₹${i.cost}</small></div></div></div>`).join("")}
+  ${o.items.map(i=>`<div class="row"><div class="it"><div class="th">${i.image?`<img src="${esc(i.image)}" alt="">`:"🛍️"}</div><div>${esc(i.name)}${i.size?" (Size "+esc(i.size)+")":""} × ${i.q}<br><small>Bechna ₹${i.price} · Meesho ₹${i.cost}</small></div></div></div>`).join("")}
   <p><b>${esc(o.name)}</b> · ${esc(o.phone)}<br>${esc(o.address)} – ${esc(o.pincode)}<br><b>Total ₹${o.total}</b> (UPI)<br>UTR: <b>${esc(o.utr||"-")}</b> <label style="display:inline"><input type="checkbox" data-pd="${o.id}" ${o.paid?"checked":""} style="width:auto"> Payment mil gaya</label></p>
   <div class="two"><button class="pri" data-copy="${o.id}">📋 Copy sab</button><select class="st" data-st="${o.id}">${["Naya","Meesho pe order kiya","Shipped","Delivered","Cancel"].map(s=>`<option ${s==o.status?"selected":""}>${s}</option>`).join("")}</select></div>${trkBox(o)}</div>`).join("")||"<p class='sm'>Abhi koi order nahi aaya.</p>")}
  else if(tab=="p"){const [ps,pv]=await Promise.all([api("/rest/v1/products?select=*&order=id.desc",{auth:1}),api("/rest/v1/product_private?select=*",{auth:1})]);
@@ -323,6 +340,10 @@ async function loadTab(){
   <div class="two"><div><label>Category</label><input id="pc" placeholder="Fashion" value="${esc(E?E.category:"")}"></div><div><label>Emoji</label><input id="pe" placeholder="🛍️" value="${esc(E?E.emoji:"")}"></div></div>
   <div class="two"><div><label>Meesho price ₹</label><input id="pcost" type="number" inputmode="numeric" value="${V.cost??""}"></div><div><label>Margin %</label><input id="pm" type="number" value="${V.margin??50}"></div></div>
   <label>% off (customer ko dikhega, khaali = koi off nahi)</label><input id="po" type="number" inputmode="numeric" placeholder="jaise 30" value="${E&&+E.off_pct?E.off_pct:""}">
+  <label>Sizes (comma se alag likho, khaali = size nahi)</label><input id="psz" placeholder="S, M, L, XL" value="${esc(((E&&E.sizes)||[]).join(", "))}"><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button class="ghost" data-sizes="S, M, L, XL, XXL">Kapde</button><button class="ghost" data-sizes="6, 7, 8, 9, 10">Joote</button><button class="ghost" data-sizes="Free Size">Free Size</button></div>
+  <label>Description (chhota paragraph, customer ko dikhega, English mein)</label><textarea id="pds">${esc(E?E.description||"":"")}</textarea>
+  <label>Highlights (har line mein ek point, English mein)</label><textarea id="phl" placeholder="Cotton blend&#10;Regular fit">${esc(E?E.highlights||"":"")}</textarea>
+  <label>Instagram ya YouTube video ka link (ho to)</label><input id="pvd" value="${esc(E?E.video_url||"":"")}" placeholder="https://www.instagram.com/reel/...">
   <label>Photos (4 se 6 best, max 6)</label><div id="eimgs" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px"></div><input id="pf" type="file" accept="image/*" multiple><div class="sm" id="pprev"></div>
   <p class="sm" id="pv">Bechne ka daam yahan dikhega</p>
   <div id="pbar" style="display:none;background:var(--bd);border-radius:99px;height:12px;margin:6px 0 12px;overflow:hidden"><div id="pfill" style="height:12px;width:0;border-radius:99px;background:linear-gradient(90deg,var(--ac),var(--ac2));transition:width .2s"></div></div>
@@ -337,7 +358,7 @@ async function loadTab(){
  else T.innerHTML=`<div class="ord"><b>UPI (paisa yahan aayega)</b><label>Aapki UPI ID</label><input id="upi" value="${esc(S.upi)}" placeholder="naam@bank"><label>Naam (customer ko dikhega)</label><input id="upn" value="${esc(S.upn)}"><label>Saman kitne din mein pahunchega (customer ko dikhega, English mein likho, jaise 5-9 days)</label><input id="dtx" value="${esc(S.dt)}" placeholder="5-9 days"><button class="pri" id="supi" style="margin-top:10px;width:100%">Save</button></div><button class="ghost" id="lo" style="width:100%">Logout</button>`
  }catch(e){T.innerHTML=`<p class="sm">Dikkat aayi: ${esc(e.message)}</p>`}}
 async function addProduct(){
- const n=$("pn").value.trim(),c=+$("pcost").value,m=+$("pm").value||0,off=Math.min(90,Math.max(0,+$("po").value||0));if(!n||!c)return alert("Naam aur Meesho price zaroori hai");
+ const n=$("pn").value.trim(),c=+$("pcost").value,m=+$("pm").value||0,off=Math.min(90,Math.max(0,+$("po").value||0));if(!n||!c)return alert("Naam aur Meesho price zaroori hai");const szs=[...new Set($("psz").value.split(",").map(s=>s.trim()).filter(Boolean))].slice(0,12),vd=$("pvd").value.trim();if(vd&&!VID.test(vd))return alert("Video ka link sirf Instagram ya YouTube ka hi daalein (https:// se shuru)");
  const fs=[...$("pf").files].slice(0,Math.max(0,6-EI.length)),tot=EI.length+fs.length;if(tot>0&&tot<4&&!confirm("Sirf "+tot+" photo hain. 4 se 6 photo se zyada bikri hoti hai. Phir bhi aage badhein?"))return;
  const b=$("padd");b.disabled=true;b.textContent="Upload ho raha hai...";
  try{const urls=[];
@@ -358,7 +379,7 @@ async function addProduct(){
  for(let j=0;j<blobs.length;j++){const nm=Date.now()+"-"+j+".jpg";await send(blobs[j],nm);done+=blobs[j].size;urls.push(U+"/storage/v1/object/public/product-images/"+nm)}
  setP(97);
  const price=Math.round(c*(1+m/100)/10)*10-1,imgs=[...EI,...urls];
- const base={name:n,category:$("pc").value.trim()||"Other",emoji:$("pe").value||"🛍️",price,images:imgs,off_pct:off},prv={cost:c,margin:m,meesho_link:$("pl").value.trim()||null};
+ const base={name:n,category:$("pc").value.trim()||"Other",emoji:$("pe").value||"🛍️",price,images:imgs,off_pct:off,sizes:szs,description:$("pds").value.trim()||null,highlights:$("phl").value.trim()||null,video_url:vd||null},prv={cost:c,margin:m,meesho_link:$("pl").value.trim()||null};
  if(editId){await api("/rest/v1/products?id=eq."+editId,{m:"PATCH",b:base,auth:1});await api("/rest/v1/product_private?product_id=eq."+editId,{m:"PATCH",b:prv,auth:1})}
  else{const row=await api("/rest/v1/products",{m:"POST",b:base,auth:1,prefer:"return=representation"});await api("/rest/v1/product_private",{m:"POST",b:{product_id:row[0].id,...prv},auth:1})}
  editId=null;
@@ -369,15 +390,17 @@ document.addEventListener("click",async e=>{
  const t=e.target,d=t.dataset||{};
  if(d.c){cat=d.c;renderStore();if(t.closest&&t.closest(".strip"))$("shop").scrollIntoView()}
  if(d.w){const i=+d.w;WL=WL.includes(i)?WL.filter(x=>x!=i):[...WL,i];ls("wl",JSON.stringify(WL));renderStore()}
- if(d.b){cart[d.b]=cart[d.b]||1;renderCart();$("prodP").classList.remove("open");$("form").style.display="";$("done").style.display="none";$("cartP").classList.add("open")}
+ if(d.b)addItem(+d.b,"buy",!!t.closest("#prodP"));
+ if(d.sz!==undefined){selSize=d.sz;document.querySelectorAll(".szc").forEach(x=>x.classList.toggle("on",x.dataset.sz==selSize))}
+ if(d.sizes){$("psz").value=d.sizes}
  if(d.v)showProd(d.v);
  if(d.th!==undefined){const p=P.find(p=>p.id==d.pid);$("mainimg").innerHTML=`<img src="${esc(p.images[d.th])}" alt="">`}
- if(d.a){cart[d.a]=(cart[d.a]||0)+1;renderCart();$("prodP").classList.remove("open");$("form").style.display="";$("done").style.display="none";$("cartP").classList.add("open")}
+ if(d.a)addItem(+d.a,"add",!!t.closest("#prodP"));
  if(d.p){cart[d.p]++;renderCart()}
  if(d.m&&--cart[d.m]<=0){delete cart[d.m];renderCart()}
  if("close" in d)document.querySelectorAll(".panel").forEach(x=>x.classList.remove("open"));
  if(d.t){tab=d.t;curT=null;editId=null;document.querySelectorAll(".tabs .chip").forEach(x=>x.classList.toggle("on",x.dataset.t==tab));loadTab()}
- if(d.copy){const o=window.OS.find(o=>o.id==d.copy);copy(`Naam: ${o.name}\nMobile: ${o.phone}\nAddress: ${o.address}\nPincode: ${o.pincode}\n\n`+o.items.map(i=>`${i.name} x${i.q}${i.link?"\n"+i.link:""}`).join("\n"),t)}
+ if(d.copy){const o=window.OS.find(o=>o.id==d.copy);copy(`Naam: ${o.name}\nMobile: ${o.phone}\nAddress: ${o.address}\nPincode: ${o.pincode}\n\n`+o.items.map(i=>`${i.name}${i.size?" (Size: "+i.size+")":""} x${i.q}${i.link?"\n"+i.link:""}`).join("\n"),t)}
  if(d.del&&confirm("Ye product hata dein?")){try{await api("/rest/v1/products?id=eq."+d.del,{m:"DELETE",auth:1});load();loadTab()}catch(x){alert(x.message)}}
  if(d.thr!==undefined){curT=d.thr||null;loadTab()}
  if(d.edit){editId=+d.edit;tab="p";loadTab();scrollTo(0,0)}
@@ -408,7 +431,7 @@ $("place").onclick=()=>{
  const ids=cartIds();if(!ids.length)return alert("Your cart is empty");const v=k=>$(k).value.trim();
  if(!v("cn")||!/^\d{10}$/.test(v("cp"))||v("ca").length<8||!/^\d{6}$/.test(v("cz")))return alert("Please enter your name, a 10-digit mobile number, your full address and a 6-digit pincode");
  if(!S.upi)return alert("This store has not set up UPI yet. Please contact us in the Help chat.");
- PEND={name:v("cn"),phone:v("cp"),addr:v("ca"),pin:v("cz"),items:ids.map(i=>({id:+i,q:cart[i]})),total:ids.reduce((s,i)=>s+cart[i]*P.find(p=>p.id==i).price,0)};
+ PEND={name:v("cn"),phone:v("cp"),addr:v("ca"),pin:v("cz"),items:ids.map(i=>({id:pid(i),q:cart[i],size:psz(i)})),total:ids.reduce((s,i)=>s+cart[i]*P.find(p=>p.id==pid(i)).price,0)};
  const link=`upi://pay?pa=${encodeURIComponent(S.upi)}&pn=${encodeURIComponent(S.upn)}&am=${PEND.total}&cu=INR&tn=${encodeURIComponent("Anurag TRADEX order")}`;
  let qr="";try{const q=qrcode(0,"M");q.addData(link);q.make();qr=q.createSvgTag(5,2)}catch(e){}
  $("form").style.display="none";$("done").style.display="block";
