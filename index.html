@@ -189,7 +189,7 @@ details p{color:var(--mu);margin:8px 0 0;font-size:14px}
   <div class="row"><h2 style="margin:0">Owner Dashboard</h2><a href="#" class="sm" style="color:var(--ac)">← Store</a></div>
   <div id="lock"><label>Email</label><input id="le" type="email" autocomplete="username"><label>Password</label><input id="lp" type="password" autocomplete="current-password"><button class="pri" id="login" style="margin-top:12px;width:100%">Login</button></div>
   <div id="dash" style="display:none">
-    <div class="tabs"><button class="chip on" data-t="o">Orders</button><button class="chip" data-t="p">Products</button><button class="chip" data-t="m">Support<span id="bd"></span></button><button class="chip" data-t="s">Settings</button></div>
+    <div class="tabs"><button class="chip on" data-t="o">Orders<span id="bo"></span></button><button class="chip" data-t="p">Products</button><button class="chip" data-t="m">Support<span id="bd"></span></button><button class="chip" data-t="s">Settings</button></div>
     <div id="tab"></div>
   </div>
 </div>
@@ -310,7 +310,7 @@ $("tbtn").onclick=async()=>{const id=+$("to").value,ph=$("tp").value.trim();if(!
  catch(e){r.textContent="Status is not available right now. Please try again in a while."}};
 
 /* ---------- admin ---------- */
-async function route(){const a=location.hash=="#admin";$("store").style.display=a?"none":"";$("admin").style.display=a?"":"none";
+async function route(){const a=location.hash=="#admin";if(!a)document.title="Anurag TRADEX – Style That Fits Your Budget";$("store").style.display=a?"none":"";$("admin").style.display=a?"":"none";
  $("lock").style.display=TOK?"none":"";$("dash").style.display=TOK?"":"none";if(a&&TOK)loadTab()}
 $("login").onclick=async()=>{try{const r=await fetch(U+"/auth/v1/token?grant_type=password",{method:"POST",headers:{apikey:K,"Content-Type":"application/json"},body:JSON.stringify({email:$("le").value.trim(),password:$("lp").value})});
  const j=await r.json();if(!r.ok||!j.access_token)return alert("Email ya password galat hai");TOK=j.access_token;try{sessionStorage.setItem("tk",TOK)}catch(e){}$("lp").value="";route()}catch(e){alert("Login nahi ho paya, internet check karein")}};
@@ -323,9 +323,12 @@ const trkBox=o=>`<details style="margin-top:10px"><summary>🚚 Tracking${o.trac
 <p class="sm">Yahan Meesho ka naam mat likhna, ye customer ko dikhta hai.</p>
 <button class="pri" data-trk="${o.id}" style="width:100%">Tracking save karein</button></details>`;
 const drawEI=()=>{const d=$("eimgs");if(d)d.innerHTML=EI.map((u,i)=>`<div style="position:relative"><div class="th" style="width:64px;height:64px"><img src="${esc(u)}" alt=""></div><button class="ghost" data-rmimg="${i}" style="position:absolute;top:-6px;right:-6px;padding:0 7px;border-radius:99px;background:var(--bg)">✕</button></div>`).join("")};
+async function badges(){try{const [m,o]=await Promise.all([api("/rest/v1/messages?select=id&sender=eq.customer&seen=eq.false",{auth:1}),api("/rest/v1/orders?select=id&status=eq.Naya",{auth:1})]);
+ $("bd").innerHTML=m.length?`<span class="bd">${m.length}</span>`:"";$("bo").innerHTML=o.length?`<span class="bd">${o.length}</span>`:"";
+ const n=m.length+o.length;document.title=(n?"("+n+") ":"")+"Anurag TRADEX"}catch(e){}}
 async function loadTab(){
  const T=$("tab");T.innerHTML="<p class='sm'>Loading...</p>";
- try{api("/rest/v1/messages?select=id&sender=eq.customer&seen=eq.false",{auth:1}).then(r=>$("bd").innerHTML=r.length?`<span class="bd">${r.length}</span>`:"").catch(()=>{});
+ try{badges();
  if(tab=="o"){const os=await api("/rest/v1/orders?select=*&order=id.desc",{auth:1});window.OS=os;
   const pf=o=>o.items.reduce((s,i)=>s+i.q*(i.price-i.cost),0),tp=os.filter(o=>o.paid).reduce((s,o)=>s+pf(o),0);
   T.innerHTML=`<div class="two"><div class="trust" style="display:block;margin:0"><div><b>${os.length}</b>Total orders</div></div><div class="trust" style="display:block;margin:0"><div><b class="profit">₹${tp}</b>Profit (paid orders)</div></div></div><br>`+
@@ -441,6 +444,7 @@ $("menuChat").onclick=e=>{e.preventDefault();document.querySelectorAll(".panel")
 $("srchBtn").onclick=()=>{const b=$("sbar");b.style.display=b.style.display=="none"?"":"none";if(b.style.display=="")$("sq").focus();else{qs="";$("sq").value="";renderStore()}};
 $("sq").oninput=()=>{qs=$("sq").value.trim().toLowerCase();renderStore()};
 addEventListener("hashchange",route);
+setInterval(()=>{if(TOK&&location.hash=="#admin"&&!document.hidden)badges()},30000);
 load();route();
 </script>
 </body>
