@@ -138,6 +138,12 @@ details p{color:var(--mu);margin:8px 0 0;font-size:14px}
 .hl{margin:6px 0 10px;padding-left:18px;font-size:13px;color:var(--tx)}.hl li{margin:3px 0}
 .vid{display:block;text-align:center;text-decoration:none;border:1px solid var(--ac);color:var(--ac);border-radius:999px;padding:11px;font-weight:700;margin:8px 0;font-size:13px;letter-spacing:.5px}
 
+.stars{color:#ffc857;letter-spacing:1px}
+.stp{display:flex;gap:6px;margin:8px 0}
+.star{background:transparent;border:0;color:#ffc857;font-size:32px;padding:0 4px}
+.rv{border-top:1px solid #25805f;padding:10px 0;font-size:13px}.rv img{display:block;max-width:140px;border-radius:10px;margin-top:6px}
+.tabs{overflow-x:auto}.tabs .chip{flex:1 0 auto;white-space:nowrap}
+
 .fab{position:fixed;right:14px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:8;box-shadow:0 0 22px #1de9a066;border-radius:99px;padding:13px 18px}
 .bub{max-width:80%;padding:8px 12px;border-radius:14px;margin:6px 0;background:var(--card);font-size:14px;word-wrap:break-word}
 .bub.me{margin-left:auto;background:var(--ac);color:#022}
@@ -189,7 +195,7 @@ details p{color:var(--mu);margin:8px 0 0;font-size:14px}
   <div class="row"><h2 style="margin:0">Owner Dashboard</h2><a href="#" class="sm" style="color:var(--ac)">← Store</a></div>
   <div id="lock"><label>Email</label><input id="le" type="email" autocomplete="username"><label>Password</label><input id="lp" type="password" autocomplete="current-password"><button class="pri" id="login" style="margin-top:12px;width:100%">Login</button></div>
   <div id="dash" style="display:none">
-    <div class="tabs"><button class="chip on" data-t="o">Orders<span id="bo"></span></button><button class="chip" data-t="p">Products</button><button class="chip" data-t="m">Support<span id="bd"></span></button><button class="chip" data-t="s">Settings</button></div>
+    <div class="tabs"><button class="chip on" data-t="o">Orders<span id="bo"></span></button><button class="chip" data-t="p">Products</button><button class="chip" data-t="m">Support<span id="bd"></span></button><button class="chip" data-t="v">Reviews<span id="br"></span></button><button class="chip" data-t="s">Settings</button></div>
     <div id="tab"></div>
   </div>
 </div>
@@ -220,6 +226,7 @@ details p{color:var(--mu);margin:8px 0 0;font-size:14px}
   <div class="two" style="grid-template-columns:1fr auto;margin-top:8px"><input id="ci" placeholder="Type your question..."><button class="pri" id="cs">Send</button></div>
 </div></div>
 
+<div class="panel" id="revP"><div class="sheet" id="revS"></div></div>
 <script>
 const U="https://kmxuwrnvjksoqvsrmafv.supabase.co",K="sb_publishable_34eT1rugG1FOY-ZCBQMvyA_FRYmh6iv";
 const $=id=>document.getElementById(id);
@@ -237,7 +244,7 @@ async function api(p,o={}){
 const rpc=(f,b,a)=>api("/rest/v1/rpc/"+f,{m:"POST",b,auth:a});
 const ls=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){}};
 
-let P=[],cart={},cat="Sab",S={upi:"",upn:"Anurag TRADEX",dt:"5-9 days"},PEND=null,tab="o",curT=null,editId=null,EI=[],qs="",selSize="";
+let P=[],cart={},cat="Sab",S={upi:"",upn:"Anurag TRADEX",dt:"5-9 days"},RT={},PEND=null,tab="o",curT=null,editId=null,EI=[],qs="",selSize="";
 const enDt=s=>String(s).replace(/\s*se\s*/i,"-").replace(/\s*din\b/i," days");
 const off=p=>+p.off_pct||0;
 const mrp=p=>off(p)>0?Math.round(p.price/(1-off(p)/100)/10)*10-1:p.price;
@@ -248,6 +255,7 @@ async function load(){
  try{try{P=await api("/rest/v1/products?select=id,name,category,emoji,price,images,off_pct,description,highlights,sizes,video_url&active=eq.true&order=id.desc")}catch(e00){try{P=await api("/rest/v1/products?select=id,name,category,emoji,price,images,off_pct&active=eq.true&order=id.desc")}catch(e0){P=await api("/rest/v1/products?select=id,name,category,emoji,price,images&active=eq.true&order=id.desc")}}}
  catch(e){$("grid").innerHTML="<p class='sm'>Products could not load. Please check your internet.</p>";return}
  try{(await api("/rest/v1/settings?select=key,value")).forEach(r=>{if(r.key=="upi_id")S.upi=r.value||"";if(r.key=="upi_name"&&r.value)S.upn=r.value;if(r.key=="delivery_text"&&r.value)S.dt=enDt(r.value)})}catch(e){}
+ try{RT={};(await rpc("product_ratings",{})).forEach(x=>RT[x.product_id]={a:x.avg_rating,c:x.cnt})}catch(e){}
  renderStore()}
 let WL=[];try{WL=JSON.parse(ls("wl")||"[]")}catch(e){}
 function visible(){return P.filter(p=>{if(qs&&!(p.name+" "+p.category).toLowerCase().includes(qs))return false;
@@ -256,7 +264,7 @@ function renderStore(){
  const navs=[["Sab","NEW ARRIVALS"],...[...new Set(P.map(p=>p.category))].map(c=>[c,c.toUpperCase()]),["__sale","SALE"],["__wl","♡ SAVED"]];
  $("cats").innerHTML=navs.map(([v,l])=>`<button class="nv ${v==cat?"on":""}" data-c="${esc(v)}">${esc(l)}</button>`).join("");
  const L=visible();
- $("grid").innerHTML=L.map((p,i)=>`<div class="card ${i==0&&L.length>2&&cat=="Sab"&&!qs?"feat":""}"><div class="pic" data-v="${p.id}" style="cursor:pointer">${im(p)}${offTag(p)}<button class="heart ${WL.includes(p.id)?"on":""}" data-w="${p.id}" aria-label="Save">${WL.includes(p.id)?"♥":"♡"}</button></div><div class="info"><div class="nmpr"><div class="nm" data-v="${p.id}" style="cursor:pointer">${esc(p.name)}</div><div class="pr">₹${p.price}${oldP(p)}</div></div><div class="ct">${esc(p.category)}</div></div><div class="btns"><button class="pri" data-b="${p.id}">BUY NOW</button><button class="ghost" data-a="${p.id}">Add to Cart</button></div></div>`).join("")||`<p class="sm">${cat=="__wl"?"No saved items yet. Tap ♡ on any product.":cat=="__sale"?"No sale items right now.":qs?"No products found.":"New products coming soon."}</p>`;
+ $("grid").innerHTML=L.map((p,i)=>`<div class="card ${i==0&&L.length>2&&cat=="Sab"&&!qs?"feat":""}"><div class="pic" data-v="${p.id}" style="cursor:pointer">${im(p)}${offTag(p)}<button class="heart ${WL.includes(p.id)?"on":""}" data-w="${p.id}" aria-label="Save">${WL.includes(p.id)?"♥":"♡"}</button></div><div class="info"><div class="nmpr"><div class="nm" data-v="${p.id}" style="cursor:pointer">${esc(p.name)}</div><div class="pr">₹${p.price}${oldP(p)}</div></div><div class="ct">${esc(p.category)}${RT[p.id]?` · <span class="stars">★</span> ${RT[p.id].a} (${RT[p.id].c})`:""}</div></div><div class="btns"><button class="pri" data-b="${p.id}">BUY NOW</button><button class="ghost" data-a="${p.id}">Add to Cart</button></div></div>`).join("")||`<p class="sm">${cat=="__wl"?"No saved items yet. Tap ♡ on any product.":cat=="__sale"?"No sale items right now.":qs?"No products found.":"New products coming soon."}</p>`;
  if($("fqd"))$("fqd").textContent="Usually "+S.dt+". It may vary slightly by city.";
  renderCart()}
 const pid=k=>+String(k).split("~")[0],psz=k=>String(k).split("~")[1]||"";
@@ -265,19 +273,31 @@ function renderCart(){
  const ids=cartIds(),n=ids.reduce((s,i)=>s+cart[i],0);$("cnt").textContent=n;$("cnt").style.display=n?"":"none";
  $("items").innerHTML=ids.length?ids.map(i=>{const p=P.find(p=>p.id==pid(i));return `<div class="row"><div class="it"><div class="th">${im(p)}</div><div>${esc(p.name)}${psz(i)?` <small>(Size ${esc(psz(i))})</small>`:""}<br><small>₹${p.price}</small></div></div><span class="qty"><button class="ghost" data-m="${i}">−</button> ${cart[i]} <button class="ghost" data-p="${i}">+</button></span></div>`}).join(""):"<p class='sm'>Your cart is empty.</p>";
  $("tot").textContent="₹"+ids.reduce((s,i)=>s+cart[i]*P.find(p=>p.id==pid(i)).price,0)}
+const stars=n=>{n=Math.round(n);return "★".repeat(n)+"☆".repeat(5-n)};
+async function loadRevs(id){const d=$("revs");if(!d)return;
+ try{const r=await api("/rest/v1/reviews?select=name,rating,body,image,created_at&product_id=eq."+id+"&approved=eq.true&order=created_at.desc&limit=10");
+  d.innerHTML=r.length?`<h2 style="margin:6px 0 4px">Customer Reviews</h2>`+r.map(x=>`<div class="rv"><b>${esc(x.name)}</b> <span class="stars">${stars(x.rating)}</span>${x.body?`<br><span style="white-space:pre-line">${esc(x.body)}</span>`:""}${x.image&&/^data:image\//.test(x.image)?`<img src="${esc(x.image)}" alt="">`:""}</div>`).join(""):""}catch(e){}}
+const shrinkImg=f=>new Promise((res,rej)=>{const u=URL.createObjectURL(f),im=new Image(),to=setTimeout(()=>rej(),15000);
+ im.onload=()=>{clearTimeout(to);const k=Math.min(1,480/Math.max(im.width,im.height)),cv=document.createElement("canvas");cv.width=Math.round(im.width*k);cv.height=Math.round(im.height*k);cv.getContext("2d").drawImage(im,0,0,cv.width,cv.height);let q=.7,d=cv.toDataURL("image/jpeg",q);while(d.length>140000&&q>.3){q-=.1;d=cv.toDataURL("image/jpeg",q)}URL.revokeObjectURL(u);d.length>150000?rej():res(d)};
+ im.onerror=()=>{clearTimeout(to);rej()};im.src=u});
+let RV={};
+function openReview(pid){const it=((window.TRK&&window.TRK.items)||[]).find(i=>+i.id==pid);if(!it)return;
+ RV={order:TRK.id,phone:TRK.ph,product:pid,rating:0,image:null};
+ $("revS").innerHTML=`<div class="row"><b>Rate your purchase</b><button class="ghost" data-close>✕</button></div><p>${esc(it.name)}</p><div class="stp">${[1,2,3,4,5].map(n=>`<button class="star" data-star="${n}">☆</button>`).join("")}</div><label>Your review (optional)</label><textarea id="rb" maxlength="600" placeholder="How was the product?"></textarea><label>Add a photo (optional)</label><input id="rf" type="file" accept="image/*"><button class="pri" id="rsub" style="width:100%;margin-top:14px;padding:13px">Submit review</button><p class="sm">Your review will appear after approval.</p>`;
+ $("revP").classList.add("open")}
 const VID=/^https:\/\/(www\.|m\.)?(instagram\.com|youtube\.com|youtu\.be)\//i;
 function addItem(id,mode,panel){const p=P.find(p=>p.id==id);if(!p)return;let key=String(id);
  if((p.sizes||[]).length){if(!panel){showProd(id);return}if(!selSize){alert("Please select a size");return}key=id+"~"+selSize}
  cart[key]=mode=="buy"?(cart[key]||1):(cart[key]||0)+1;renderCart();
  $("prodP").classList.remove("open");$("form").style.display="";$("done").style.display="none";$("cartP").classList.add("open")}
 function showProd(id){const p=P.find(p=>p.id==id);if(!p)return;selSize="";const ims=p.images||[],szs=p.sizes||[],hl=(p.highlights||"").split("\n").map(s=>s.trim()).filter(Boolean);
- $("prodS").innerHTML=`<div class="row"><b>${esc(p.name)}</b><button class="ghost" data-close>✕</button></div><div class="pic" id="mainimg" style="margin:10px 0 0;font-size:90px">${ims[0]?`<img src="${esc(ims[0])}" alt="">`:(p.emoji||"🛍️")}</div><div style="display:flex;gap:8px;margin:10px 0;overflow-x:auto">${ims.map((s,i)=>`<div class="th" style="width:62px;height:62px;cursor:pointer" data-th="${i}" data-pid="${p.id}"><img src="${esc(s)}" alt=""></div>`).join("")}</div><div class="pr" style="font-size:24px;text-align:left">₹${p.price}${oldP(p)}</div><p class="sm">${esc(p.category)} · UPI payment · Pan-India delivery</p>`+
+ $("prodS").innerHTML=`<div class="row"><b>${esc(p.name)}</b><button class="ghost" data-close>✕</button></div><div class="pic" id="mainimg" style="margin:10px 0 0;font-size:90px">${ims[0]?`<img src="${esc(ims[0])}" alt="">`:(p.emoji||"🛍️")}</div><div style="display:flex;gap:8px;margin:10px 0;overflow-x:auto">${ims.map((s,i)=>`<div class="th" style="width:62px;height:62px;cursor:pointer" data-th="${i}" data-pid="${p.id}"><img src="${esc(s)}" alt=""></div>`).join("")}</div><div class="pr" style="font-size:24px;text-align:left">₹${p.price}${oldP(p)}</div><p class="sm">${esc(p.category)} · UPI payment · Pan-India delivery</p>${RT[p.id]?`<p style="margin:0 0 6px"><span class="stars">${stars(RT[p.id].a)}</span> <b>${RT[p.id].a}</b> <span class="sm">(${RT[p.id].c} reviews)</span></p>`:""}`+
  (szs.length?`<label style="margin-top:6px">Select size</label><div class="szs">${szs.map(s=>`<button class="szc" data-sz="${esc(s)}">${esc(s)}</button>`).join("")}</div>`:"")+
  (p.description?`<p style="white-space:pre-line;font-size:13px;color:var(--mu);margin:12px 0 6px">${esc(p.description)}</p>`:"")+
  (hl.length?`<ul class="hl">${hl.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:"")+
  (p.video_url&&VID.test(p.video_url)?`<a class="vid" href="${esc(p.video_url)}" target="_blank" rel="noopener">▶ Watch video</a>`:"")+
- `<div class="btns" style="padding:0;margin-top:12px"><button class="pri" data-b="${p.id}">BUY NOW</button><button class="ghost" data-a="${p.id}">Add to Cart</button></div>`;
- $("prodP").classList.add("open")}
+ `<div class="btns" style="padding:0;margin-top:12px"><button class="pri" data-b="${p.id}">BUY NOW</button><button class="ghost" data-a="${p.id}">Add to Cart</button></div><div id="revs" style="margin-top:14px"></div>`;
+ $("prodP").classList.add("open");loadRevs(id)}
 function copy(t,btn){const ok=()=>{if(btn){const o=btn.textContent;btn.textContent="✓ Copy ho gaya";setTimeout(()=>btn.textContent=o,1500)}};
  const fb=()=>{const a=document.createElement("textarea");a.value=t;document.body.appendChild(a);a.select();try{document.execCommand("copy");ok()}catch(e){}a.remove()};
  try{navigator.clipboard.writeText(t).then(ok,fb)}catch(e){fb()}}
@@ -300,9 +320,9 @@ $("tbtn").onclick=async()=>{const id=+$("to").value,ph=$("tp").value.trim();if(!
  try{const o=await rpc("track_order",{p_id:id,p_phone:ph});
   if(!o){r.textContent="Order not found. Please check your order number and mobile number.";return}
   const idx=o.status=="Delivered"?4:o.status=="Shipped"?3:o.status=="Packed"?2:(o.paid?1:0);
-  const line=o.status=="Cancel"?`<p><b>❌ This order has been cancelled.</b></p>`:`<div style="display:flex;gap:4px;margin:10px 0">${STEPS.map((s,i)=>`<div style="flex:1;text-align:center;font-size:10.5px;color:${i<=idx?"var(--ac)":"var(--mu)"}"><div style="height:6px;border-radius:99px;background:${i<=idx?"var(--ac)":"var(--bd)"};margin-bottom:5px"></div>${i<=idx?"✔ ":""}${s}</div>`).join("")}</div>`;
+  window.TRK={id:o.id,ph,items:o.items||[]};const line=o.status=="Cancel"?`<p><b>❌ This order has been cancelled.</b></p>`:`<div style="display:flex;gap:4px;margin:10px 0">${STEPS.map((s,i)=>`<div style="flex:1;text-align:center;font-size:10.5px;color:${i<=idx?"var(--ac)":"var(--mu)"}"><div style="height:6px;border-radius:99px;background:${i<=idx?"var(--ac)":"var(--bd)"};margin-bottom:5px"></div>${i<=idx?"✔ ":""}${s}</div>`).join("")}</div>`;
   const lk=o.tracking_link&&/^https?:\/\//.test(o.tracking_link)?` · <a href="${esc(o.tracking_link)}" target="_blank" rel="noopener" style="color:var(--ac)">Open link</a>`:"";
-  r.innerHTML=`<b>Order #${o.id}</b> · ${esc(ST_EN[o.status]||o.status)}${line}${(o.items||[]).map(i=>esc(i.name)+" × "+esc(i.q)).join("<br>")}<br>Total ₹${o.total}`+
+  r.innerHTML=`<b>Order #${o.id}</b> · ${esc(ST_EN[o.status]||o.status)}${line}${(o.items||[]).map(i=>`<div style="margin:3px 0">${esc(i.name)} × ${esc(i.q)}${o.status=="Delivered"&&i.id?(i.reviewed?` <span class="sm">✓ Reviewed</span>`:` <button class="ghost" data-rv="${esc(i.id)}" style="padding:3px 10px;margin-left:6px;font-size:12px">⭐ Rate</button>`):""}</div>`).join("")}<br>Total ₹${o.total}`+
    (o.courier||o.tracking_id?`<br><b>Courier:</b> ${esc(o.courier||"-")}<br><b>Tracking ID:</b> ${esc(o.tracking_id||"-")}${lk}`:"")+
    (o.eta?`<br><b>Expected by:</b> ${esc(o.eta)}`:`<br><b>Expected in:</b> about ${esc(S.dt)}`)+
    (o.note?`<br><b>Note:</b> ${esc(o.note)}`:"")+
@@ -323,9 +343,9 @@ const trkBox=o=>`<details style="margin-top:10px"><summary>🚚 Tracking${o.trac
 <p class="sm">Yahan Meesho ka naam mat likhna, ye customer ko dikhta hai.</p>
 <button class="pri" data-trk="${o.id}" style="width:100%">Tracking save karein</button></details>`;
 const drawEI=()=>{const d=$("eimgs");if(d)d.innerHTML=EI.map((u,i)=>`<div style="position:relative"><div class="th" style="width:64px;height:64px"><img src="${esc(u)}" alt=""></div><button class="ghost" data-rmimg="${i}" style="position:absolute;top:-6px;right:-6px;padding:0 7px;border-radius:99px;background:var(--bg)">✕</button></div>`).join("")};
-async function badges(){try{const [m,o]=await Promise.all([api("/rest/v1/messages?select=id&sender=eq.customer&seen=eq.false",{auth:1}),api("/rest/v1/orders?select=id&status=eq.Naya",{auth:1})]);
- $("bd").innerHTML=m.length?`<span class="bd">${m.length}</span>`:"";$("bo").innerHTML=o.length?`<span class="bd">${o.length}</span>`:"";
- const n=m.length+o.length;document.title=(n?"("+n+") ":"")+"Anurag TRADEX"}catch(e){}}
+async function badges(){try{const [m,o,v]=await Promise.all([api("/rest/v1/messages?select=id&sender=eq.customer&seen=eq.false",{auth:1}),api("/rest/v1/orders?select=id&status=eq.Naya",{auth:1}),api("/rest/v1/reviews?select=id&approved=eq.false",{auth:1}).catch(()=>[])]);
+ $("bd").innerHTML=m.length?`<span class="bd">${m.length}</span>`:"";$("bo").innerHTML=o.length?`<span class="bd">${o.length}</span>`:"";$("br").innerHTML=v.length?`<span class="bd">${v.length}</span>`:"";
+ const n=m.length+o.length+v.length;document.title=(n?"("+n+") ":"")+"Anurag TRADEX"}catch(e){}}
 async function loadTab(){
  const T=$("tab");T.innerHTML="<p class='sm'>Loading...</p>";
  try{badges();
@@ -354,6 +374,9 @@ async function loadTab(){
   ps.map(p=>{const v=pm[p.id]||{};return `<div class="row"><div class="it"><div class="th">${im(p)}</div><div>${esc(p.name)}<br><small>Meesho ₹${v.cost??"-"} → ₹${p.price} (profit ₹${p.price-(v.cost||0)})${+p.off_pct?` · ${p.off_pct}% off`:""}</small></div></div><span><button class="ghost" data-edit="${p.id}">✏️</button> <button class="ghost" data-del="${p.id}">🗑</button></span></div>`}).join("");
   drawEI();
   const up=()=>{const c=+$("pcost").value,m=+$("pm").value,pr=Math.round(c*(1+m/100)/10)*10-1;$("pv").textContent=c?`Bechne ka daam ₹${pr} · profit ₹${pr-c}`:"Bechne ka daam yahan dikhega"};$("pcost").oninput=up;$("pm").oninput=up;up()}
+ else if(tab=="v"){const [rs,ps]=await Promise.all([api("/rest/v1/reviews?select=*&order=created_at.desc",{auth:1}),api("/rest/v1/products?select=id,name",{auth:1})]);
+  const pn={};ps.forEach(p=>pn[p.id]=p.name);
+  T.innerHTML=rs.map(x=>`<div class="ord"><h3><span>${esc(pn[x.product_id]||"Product #"+x.product_id)}</span><span class="stars">${"★".repeat(x.rating)}${"☆".repeat(5-x.rating)}</span></h3><div class="sm">${esc(x.name)} · Order #${x.order_id} · ${fmt(x.created_at)} · ${x.approved?"✅ Dikh raha hai":"⏳ Approval baaki"}</div>${x.body?`<p style="white-space:pre-line">${esc(x.body)}</p>`:""}${x.image?`<img src="${esc(x.image)}" alt="" style="max-width:140px;border-radius:10px">`:""}<div class="two" style="margin-top:8px">${x.approved?`<button class="ghost" data-rvh="${x.id}">Hide karein</button>`:`<button class="pri" data-rva="${x.id}">✅ Approve</button>`}<button class="ghost" data-rvd="${x.id}">🗑 Delete</button></div></div>`).join("")||"<p class='sm'>Abhi koi review nahi aaya.</p>"}
  else if(tab=="m"){const ms=await api("/rest/v1/messages?select=*&order=created_at.asc",{auth:1});const g={};ms.forEach(m=>(g[m.thread]=g[m.thread]||[]).push(m));
   if(curT&&g[curT]){T.innerHTML=`<button class="ghost" data-thr="">← Sab chats</button><h3>${esc(g[curT].find(m=>m.name&&m.sender=="customer")?.name||"Customer")}</h3><div>${g[curT].map(m=>`<div class="bub ${m.sender=="owner"?"me":""}">${esc(m.body)}</div>`).join("")}</div><div class="two" style="grid-template-columns:1fr auto;margin-top:10px"><input id="ri" placeholder="Jawab likhein..."><button class="pri" id="rs">Bhejein</button></div>`;
    api("/rest/v1/messages?thread=eq."+curT+"&sender=eq.customer&seen=eq.false",{m:"PATCH",b:{seen:true},auth:1}).catch(()=>{})}
@@ -394,6 +417,10 @@ document.addEventListener("click",async e=>{
  if(d.c){cat=d.c;renderStore();if(t.closest&&t.closest(".strip"))$("shop").scrollIntoView()}
  if(d.w){const i=+d.w;WL=WL.includes(i)?WL.filter(x=>x!=i):[...WL,i];ls("wl",JSON.stringify(WL));renderStore()}
  if(d.b)addItem(+d.b,"buy",!!t.closest("#prodP"));
+ if(d.rv)openReview(+d.rv);
+ if(d.star){RV.rating=+d.star;document.querySelectorAll(".star").forEach(x=>x.textContent=+x.dataset.star<=RV.rating?"★":"☆")}
+ if(d.rva||d.rvh){try{await api("/rest/v1/reviews?id=eq."+(d.rva||d.rvh),{m:"PATCH",b:{approved:!!d.rva},auth:1});loadTab()}catch(x){alert(x.message)}}
+ if(d.rvd&&confirm("Ye review hata dein?")){try{await api("/rest/v1/reviews?id=eq."+d.rvd,{m:"DELETE",auth:1});loadTab()}catch(x){alert(x.message)}}
  if(d.sz!==undefined){selSize=d.sz;document.querySelectorAll(".szc").forEach(x=>x.classList.toggle("on",x.dataset.sz==selSize))}
  if(d.sizes){$("psz").value=d.sizes}
  if(d.v)showProd(d.v);
@@ -415,6 +442,9 @@ document.addEventListener("click",async e=>{
   catch(x){alert("Save nahi hua: "+x.message+" (pehle Supabase mein naya SQL chalaya?)")}}
  const id=t.id;
  if(id=="padd")addProduct();
+ if(id=="rsub"){if(!RV.rating)return alert("Please select a star rating");t.disabled=true;
+  try{await rpc("submit_review",{p_order:RV.order,p_phone:RV.phone,p_product:RV.product,p_rating:RV.rating,p_body:$("rb").value.trim(),p_image:RV.image});$("revP").classList.remove("open");alert("Thank you! Your review will appear after approval.");const bb=document.querySelector(`[data-rv="${RV.product}"]`);if(bb)bb.outerHTML="<span class='sm'>✓ Reviewed</span>"}
+  catch(x){alert(/already/.test(x.message)?"You have already reviewed this product.":"Review could not be sent. Please try again.");t.disabled=false}}
  if(id=="help"){try{await rpc("send_message",{p_thread:TH,p_name:ls("cname")||"Customer",p_body:`I need help with Order #${t.dataset.oid}. Mobile: ${t.dataset.ph}`});t.textContent="✓ Message sent. Our reply will appear in the Help chat"}catch(x){alert("Message could not be sent. Please try again.")}}
  if(id=="rs"){const b=$("ri").value.trim();if(b)try{await api("/rest/v1/messages",{m:"POST",b:{thread:curT,name:"Owner",sender:"owner",body:b},auth:1});loadTab()}catch(x){alert(x.message)}}
  if(id=="supi")try{for(const [k,v] of [["upi_id",$("upi").value.trim()],["upi_name",$("upn").value.trim()],["delivery_text",$("dtx").value.trim()||"5-9 days"]])await api("/rest/v1/settings?key=eq."+k,{m:"PATCH",b:{value:v},auth:1});S.upi=$("upi").value.trim();S.upn=$("upn").value.trim()||S.upn;S.dt=enDt($("dtx").value.trim()||"5-9 days");alert("Save ho gaya")}catch(x){alert(x.message)}
@@ -428,6 +458,7 @@ document.addEventListener("click",async e=>{
 document.addEventListener("change",async e=>{const t=e.target,d=t.dataset;
  try{if(d.st)await api("/rest/v1/orders?id=eq."+d.st,{m:"PATCH",b:{status:t.value},auth:1});
  if(d.pd)await api("/rest/v1/orders?id=eq."+d.pd,{m:"PATCH",b:{paid:t.checked},auth:1})}catch(x){alert(x.message)}
+ if(t.id=="rf"){const f=t.files[0];RV.image=null;if(f)shrinkImg(f).then(u=>RV.image=u).catch(()=>{t.value="";alert("This photo could not be used. Please try another one.")})}
  if(t.id=="pf"){const n=t.files.length;$("pprev").textContent=n>6?"Max 6 photo, pehli 6 li jayengi":n+" photo chuni"+(n<4?" (4 se 6 best hai)":" ✓")}});
 $("cartBtn").onclick=()=>{$("form").style.display="";$("done").style.display="none";$("cartP").classList.add("open")};
 $("place").onclick=()=>{
